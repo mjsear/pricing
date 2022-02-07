@@ -22,17 +22,12 @@ def main():
         v = 1.04**-1
         axd = 0
         if sel==len(rates.columns)-1:
-            for i in range(len(rates.columns)-1):
-                coef = 1
-                for j in range(i):
-                    coef *= (1-rates.iloc[j,j])
-                axd += coef * v**(x+i) * l(x)
-            axd += sum([1.04**(-1*i)*l(i,0) for i in np.arange(x+(len(rates.columns)-1),121,1)])
-            axd /= v**x * l(x)
+            col = len(rates.columns)-1
+            axd = sum([v**i * l(i, max(col-(i-x), 0)) for i in np.arange(x, 121)])/(v**x * l(x))
         else:
-            axd = sum([1.04**(-1*i)*l(i, 0) for i in np.arange(x,121,1)])/(v**x * l(x,0))
+            axd = sum([v**i * l(i, 0) for i in np.arange(x, 121)])/(v**x * l(x,0))
         return axd
-    
+
     def l(x, sel=len(rates.columns)-1):
         """
         Return the *percentage* of lives still living at age x. 
@@ -58,9 +53,11 @@ def main():
                 return lx
         else:
             raise IndexError("Age out of table range")
-
-    print(f"l_[53] = {l(53)} \n l_53 = {l(53,0)}")
-
+    
+    print(f"l_[53] = {l(53)}")
+    print(f"l_53 = {l(53,0)}")
+    print(f":a_[53] = {annuity_due(53)}")
+    print(f":a_53 = {annuity_due(53,0)}")
 
 if __name__ == '__main__':
     main()
