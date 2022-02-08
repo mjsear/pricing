@@ -1,6 +1,10 @@
 def main():
     import numpy as np
     import pandas as pd
+    from functools import lru_cache
+    #import time
+
+    #start_time = time.perf_counter()
 
     with open("am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR MULTIPLE RATES FILES
         rates = pd.read_csv(f, header=0, names = ["sel","sel-1","ult"], index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
@@ -29,18 +33,27 @@ def main():
         else:
             adx = sum([v**i * l(i, 0) for i in np.arange(x, 121)])/(v**x * l(x,0))
         
-        #pthly adjustment (approximation):
+        #pthly adjustment:
         adx = adx - (ppy-1)/(2*ppy)
         return adx
     
     def ann_due_temp(x, duration, sel=len(rates.columns)-1, interest_rate=0.04, ppy=1):
         #adxn = ad(x) - [D(x+n)/D(x)]ad(x+n)
+        if duration < len(rates.columns) - 1:
+            print("This number is definitly not correct, durations shorter than select periods are fucked")
         v = (1+interest_rate)**-1
-        adxn = ann_due(x, sel, interest_rate, 1) - ((v**(x+duration) * l(x+duration, 0))/(v**x * l(x, sel))) * ann_due(x+duration, 0, interest_rate, 1)
+        adx = ann_due(x, sel = sel)
+        dx = v**x * l(x, sel)
+        dxpn = v**(x+duration) * l(x+duration, 0)
+        adxpn = ann_due(x + duration, 0)
 
-        adxn = adxn - ((ppy - 1)/(2*ppy))*(1 - v**duration * (l(x+duration, 0)/l(x, sel)))
+        adxn = adx - (dxpn/dx)*adxpn
+
+        #pthly adjustment:
+        adxn = adxn - ((ppy - 1)/(2*ppy)) * (1 - v**duration * l(x + duration, 0) / l(x, sel))
         return adxn
 
+    @lru_cache(maxsize=None)
     def l(x, sel=len(rates.columns)-1):
         """
         Return the *percentage* of lives still living at age x. 
@@ -67,12 +80,17 @@ def main():
         else:
             raise IndexError("Age out of table range")
     
-    print(f"l_[53]     = {l(53):.5f}")
-    print(f"l_53       = {l(53,0):.5f}")
-    print(f":a_[53]    = {ann_due(53):.5f}")
-    print(f":a_53      = {ann_due(53,0):.5f}")
-    print(f":a_[53]:12 = {ann_due_temp(x = 53, duration = 12, sel = 2, interest_rate = 0.04, ppy = 1):.5f}")
-    print(f":a_53:12   = {ann_due_temp(x = 53, duration = 12, sel = 0, interest_rate = 0.04, ppy = 1):.5f}")
+    print(f"l_[53]....... = {l(53):.5f}")
+    print(f"l_53......... = {l(53, sel = 0):.5f}")
+    print(f":a_[53]...... = {ann_due(53):.5f}")
+    print(f":a_53........ = {ann_due(53, sel = 0):.5f}")
+    print(f":a^(4)_53.... = {ann_due(53, sel = 0, ppy = 4):.5f}")
+    print(f":a_[53]:12... = {ann_due_temp(x = 53, duration = 12):.5f}")
+    print(f":a_53:12..... = {ann_due_temp(x = 53, duration = 12, sel = 0):.5f}")
+    print(f":a^(4)_53:12. = {ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4):.5f}")
 
+    #end_time = time.perf_counter()
+    #print(f"Execution time: {end_time - start_time}")
+    
 if __name__ == '__main__':
     main()
