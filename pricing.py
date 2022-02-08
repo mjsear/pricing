@@ -6,11 +6,10 @@ def main():
 
     #start_time = time.perf_counter()
 
-    with open("am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR MULTIPLE RATES FILES
-        rates = pd.read_csv(f, header=0, names = ["sel","sel-1","ult"], index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
+    with open("data/am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR MULTIPLE RATES FILES
+        rates = pd.read_csv(f, header=0, index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
 
-    rates.rename(columns = {"q[x]":"sel", "q[x-1]+1":"sel-1"}, inplace = True)
-    rates.columns
+    #print(rates.columns)
 
     def ann_due(x, sel=len(rates.columns)-1, interest_rate=0.04, ppy=1):
         """
@@ -73,7 +72,7 @@ def main():
             else:
                 if x == rates.index[0] and sel == 0:
                     return 1
-                lx = l(x-1+sel,0)*(1-rates['ult'].loc[x-1+sel]) # (x-1) here is the basic unit, we are using the previous q rate to go back one
+                lx = l(x-1+sel,0)*(1-rates.iloc[:,-1].loc[x-1+sel]) # (x-1) here is the basic unit, we are using the previous q rate to go back one
                 for i in range(1, sel+1):
                     lx /= (1-rates.iloc[:,len(rates.columns)-1-i].loc[x+sel-i]) # here we are already starting at the destination, so no -1 is needed
                 return lx
