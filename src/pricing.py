@@ -71,7 +71,7 @@ def ann_due(x, sel=maxsel, interest_rate=0.04, ppy=1):
     adx = adx - (ppy-1)/(2*ppy)
     return adx
 
-def ann_due_temp(x, duration, sel=rates.columns[-1], interest_rate=0.04, ppy=1):
+def ann_due_temp(x, duration, sel=maxsel, interest_rate=0.04, ppy=1):
     """
     Return the expected present value for a limited term annuity paying 1 annually, contingent on life.
 
@@ -94,30 +94,43 @@ def ann_due_temp(x, duration, sel=rates.columns[-1], interest_rate=0.04, ppy=1):
     adxn = adxn - ((ppy - 1)/(2*ppy)) * (1 - v**duration * l(x + duration, 0) / l(x, sel))
     return adxn
 
-def assurance(x, duration = -1, sel=rates.columns[-1], interest_rate=0.04):
+def assurance(x, duration = 0, sel=maxsel, interest_rate=0.04):
     v = (1 + interest_rate)**-1
     base = l(x, sel) * v**x
-    ass = sum([l(i, max(sel-(i-x), 0)) * rates.loc[i, min(sel, i-x)] * v**(i+1)/base for i in range(x,121)])
+    terminus = x + duration if duration else rates.index[-1]+1
+    ass = sum([l(i, max(sel-(i-x), 0)) * rates.loc[i, max(sel-(i-x), 0)] * v**(i+1)/base for i in range(x, terminus)])
     #max(sel-(i-x), 0) yields 2, 1, 0, 0, 0... for sel = 2
     #min(sel, i-x) yields 0, 1, 2, 2, 2... for sel = 2
     return ass
 
-def endowment(x, duration, sel=rates.columns[-1], interest_rate=0.04):
-    v = (1+interest_rate)^-1
+def endowment(x, duration, sel=maxsel, interest_rate=0.04):
+    v = (1+interest_rate)**-1
     mortality = l(x+duration, 0)/l(x, sel)
-    return v^duration * mortality
+    return v**duration * mortality
 
-def endo_ass():
-    return assurance() + endowment()
+def endo_ass(x, duration, sel = maxsel, interest_rate = 0.04):
+    return assurance(x, duration, sel, interest_rate) + endowment(x, duration, sel, interest_rate)
 
-def test():    
-    print(f"l_[53]....... = {l(53):.6f}") #0.962110
-    print(f"l_53......... = {l(53, sel = 0):.6f}") #0.963005
+def test():
+    print("+------------------------+")
+    print(f"l_[53]....... =  {l(53):.6f}") #0.962110
+    print(f"l_53......... =  {l(53, sel = 0):.6f}") #0.963005
+    print("+------------------------+")
     print(f":a_[53]...... = {ann_due(53):.6f}") #16.537994
     print(f":a_53........ = {ann_due(53, sel = 0):.6f}") #16.523642
     print(f":a^(4)_53.... = {ann_due(53, sel = 0, ppy = 4):.6f}") #16.148642
-    print(f":a_[53]:12... = {ann_due_temp(x = 53, duration = 12):.6f}") #9.508095
-    print(f":a_53:12..... = {ann_due_temp(x = 53, duration = 12, sel = 0):.6f}") #9.500278
-    print(f":a^(4)_53:12. = {ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4):.6f}") #9.339830
-    print(f"A_[53]....... = {assurance(53):.6f}") #0.363923
-    print(f"A_53......... = {assurance(53, sel = 0):.6f}")
+    print("+------------------------+")
+    print(f":a_[53]:12... =  {ann_due_temp(x = 53, duration = 12):.6f}") #9.508095
+    print(f":a_53:12..... =  {ann_due_temp(x = 53, duration = 12, sel = 0):.6f}") #9.500278
+    print(f":a^(4)_53:12. =  {ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4):.6f}") #9.339830
+    print("+------------------------+")
+    print(f"A_[53]....... =  {assurance(53):.6f}") #0.363923
+    print(f"A_53......... =  {assurance(53, sel = 0):.6f}") #0.364475
+    print("+------------------------+")
+    print("INSERT ENDO ASS TESTS")
+    # data = {"l_53":[l(53, 0), l(53), np.nan],
+    #         "X_l_53":[round(l(53, 0),6)==0.963005, round(l(53), 6)==0.962110, pd.isna(np.nan)],
+    #         ":a_53":[ann_due(53, 0), ann_due(53), ann_due(53, sel = 0, ppy = 4)],
+    #         "X_:a_53":[round(ann_due(53, 0), 6)==16.523642, round(ann_due(53), 6)==16.537994, round(ann_due(53, sel = 0, ppy = 4), 6)==16.148642],
+    #         ":a_53:12":[ann_due_temp(x = 53, duration = 12), ann_due_temp(x = 53, duration = 12, sel = 0), ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4)]}
+    # print(pd.DataFrame(data, index = ["ult", "sel", "qrtly"]))
