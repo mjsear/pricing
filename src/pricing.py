@@ -57,12 +57,7 @@ def ann_due(x, sel=rates.columns[-1], interest_rate=0.04, ppy=1):
     Thus, the default sel={number of columns - 1} is a just-selected life [x].
     """
     v = (1+interest_rate)**-1
-    adx = 0
-    if sel==rates.columns[-1]:
-        col = rates.columns[-1]
-        adx = sum([v**i * l(i, max(col-(i-x), 0)) for i in np.arange(x, 121)])/(v**x * l(x))
-    else:
-        adx = sum([v**i * l(i, 0) for i in np.arange(x, 121)])/(v**x * l(x,0))
+    adx = sum([v**i * l(i, max(sel-(i-x), 0)) for i in range(x, 121)])/(v**x * l(x, sel))
     
     #pthly adjustment:
     adx = adx - (ppy-1)/(2*ppy)
@@ -91,21 +86,30 @@ def ann_due_temp(x, duration, sel=rates.columns[-1], interest_rate=0.04, ppy=1):
     adxn = adxn - ((ppy - 1)/(2*ppy)) * (1 - v**duration * l(x + duration, 0) / l(x, sel))
     return adxn
 
-def assurance():
-    pass
+def assurance(x, duration = -1, sel=rates.columns[-1], interest_rate=0.04):
+    v = (1 + interest_rate)**-1
+    base = l(x, sel) * v**x
+    ass = sum([l(i, max(sel-(i-x), 0)) * rates.loc[i, min(sel, i-x)] * v**(i+1)/base for i in range(x,121)])
+    #max(sel-(i-x), 0) yields 2, 1, 0, 0, 0... for sel = 2
+    #min(sel, i-x) yields 0, 1, 2, 2, 2... for sel = 2
+    return ass
 
-def endowment():
-    pass
+def endowment(x, duration, sel=rates.columns[-1], interest_rate=0.04):
+    v = (1+interest_rate)^-1
+    mortality = l(x+duration, 0)/l(x, sel)
+    return v^duration * mortality
 
 def endo_ass():
     return assurance() + endowment()
 
 def test():    
-    print(f"l_[53]....... = {l(53):.5f}")
-    print(f"l_53......... = {l(53, sel = 0):.5f}")
-    print(f":a_[53]...... = {ann_due(53):.5f}")
-    print(f":a_53........ = {ann_due(53, sel = 0):.5f}")
-    print(f":a^(4)_53.... = {ann_due(53, sel = 0, ppy = 4):.5f}")
-    print(f":a_[53]:12... = {ann_due_temp(x = 53, duration = 12):.5f}")
-    print(f":a_53:12..... = {ann_due_temp(x = 53, duration = 12, sel = 0):.5f}")
-    print(f":a^(4)_53:12. = {ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4):.5f}")
+    print(f"l_[53]....... = {l(53):.6f}") #0.962110
+    print(f"l_53......... = {l(53, sel = 0):.6f}") #0.963005
+    print(f":a_[53]...... = {ann_due(53):.6f}") #16.537994
+    print(f":a_53........ = {ann_due(53, sel = 0):.6f}") #16.523642
+    print(f":a^(4)_53.... = {ann_due(53, sel = 0, ppy = 4):.6f}") #16.148642
+    print(f":a_[53]:12... = {ann_due_temp(x = 53, duration = 12):.6f}") #9.508095
+    print(f":a_53:12..... = {ann_due_temp(x = 53, duration = 12, sel = 0):.6f}") #9.500278
+    print(f":a^(4)_53:12. = {ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4):.6f}") #9.339830
+    print(f"A_[53]....... = {assurance(53):.6f}") #0.363923
+    print(f"A_53......... = {assurance(53, sel = 0):.6f}")
