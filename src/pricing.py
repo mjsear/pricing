@@ -13,10 +13,13 @@ from functools import lru_cache
 with open("data/am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR MULTIPLE RATES FILES
     rates = pd.read_csv(f, header=0, index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
     rates.index.name = "Age"
-    rates.columns = range(len(rates.columns))
+    rates.columns = reversed(range(len(rates.columns)))
+    maxsel = rates.columns[0] #NOTICE: This choice of definition for the column labels is important and useful below.
+                              #        Under this definition, ultimate mortality is NAMED "0", and the years of 
+                              #        remaining selection are NAMED "1", "2", etc.
 
 @lru_cache(maxsize=None)
-def l(x, sel=rates.columns[-1]):
+def l(x, sel=maxsel):
     """
     Return the *percentage* of lives still living at age x. 
     
@@ -26,24 +29,29 @@ def l(x, sel=rates.columns[-1]):
 
     Sel = 0 means ultimate, increasing by one for each year of selection REMAINING.
     Thus, the default sel={number of columns - 1} is a just-selected life [x].
-
-    This should probably be refactored such that sel=0 means select and sel=rates.columns[-1] means 
-    ultimate, the current definitions are awkward as hell.
     """
     if x in rates.index:
-        if pd.isna(rates.iloc[:,rates.columns[-1] - sel].loc[x]):
+        if pd.isna(rates.loc[x,sel]):
             raise IndexError("Age out of select range")
         else:
             if x == rates.index[0] and sel == 0:
                 return 1
-            lx = l(x-1+sel,0)*(1-rates.iloc[:,-1].loc[x-1+sel]) # (x-1) here is the basic unit, we are using the previous q rate to go back one
+            lx = l(x-1+sel,0)*(1-rates.loc[x-1+sel, 0])
+            # For select mortality, we aim to start at the equivalent ultimate, and
+            # then work our way back up to select. So, e.g., for l_[19], we want to 
+            # start with l_21 = l_20 * q_20 and then the l_20 asks for l_19 and so on, 
+            # thus we recurse back to the defined radix l_17 = 1
             for i in range(1, sel+1):
-                lx /= (1-rates.iloc[:,rates.columns[-1]-i].loc[x+sel-i]) # here we are already starting at the destination, so no -1 is needed
+                lx /= (1-rates.loc[x+sel-i, i]) 
+                # and then here, since we have obtained lx = l_21, we then divide out the px's back up to l_[19]
+                # so l_21 /= (1 - q_[19]+1)*(1 - q_[19])
+                # here we take advantage of the convenient column labels we have used, 
+                # so that the name of the year with i years of selection remaining is just i.
             return lx
     else:
         raise IndexError("Age out of table range")
 
-def ann_due(x, sel=rates.columns[-1], interest_rate=0.04, ppy=1):
+def ann_due(x, sel=maxsel, interest_rate=0.04, ppy=1):
     """
     Return the expected present value of an lifetime annuity paying amount 1 annually for a life aged x
 
