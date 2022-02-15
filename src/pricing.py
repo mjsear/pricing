@@ -11,15 +11,15 @@ import pandas as pd
 from functools import lru_cache
 
 with open("data/am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR MULTIPLE RATES FILES
-    rates = pd.read_csv(f, header=0, index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
-    rates.index.name = "Age"
-    rates.columns = reversed(range(len(rates.columns)))
-    maxsel = rates.columns[0] #NOTICE: This choice of definition for the column labels is important and useful below.
+    am92_rates = pd.read_csv(f, header=0, index_col=0) #THE COLUMN NAMES SHOULD BE UNUSED, EXCEPT IN IN-PROGRESS COMMANDS
+    am92_rates.index.name = "Age"
+    am92_rates.columns = reversed(range(len(am92_rates.columns)))
+    maxsel = am92_rates.columns[0] #NOTICE: This choice of definition for the column labels is important and useful below.
                               #        Under this definition, ultimate mortality is NAMED "0", and the years of 
                               #        remaining selection are NAMED "1", "2", etc.
 
 @lru_cache(maxsize=None)
-def l(x, sel=maxsel):
+def l(x, sel=maxsel, rates = am92_rates):
     """
     Return the *percentage* of lives still living at age x. 
     
@@ -51,7 +51,7 @@ def l(x, sel=maxsel):
     else:
         raise IndexError("Age out of table range")
 
-def ann_due(x, sel=maxsel, interest_rate=0.04, ppy=1):
+def ann_due(x, sel=maxsel, interest_rate=0.04, ppy=1, rates = am92_rates):
     """
     Return the expected present value of an lifetime annuity paying amount 1 annually for a life aged x
 
@@ -71,16 +71,27 @@ def ann_due(x, sel=maxsel, interest_rate=0.04, ppy=1):
     adx = adx - (ppy-1)/(2*ppy)
     return adx
 
-def ann_due_temp(x, duration, sel=maxsel, interest_rate=0.04, ppy=1):
+def ann_due_temp(x, duration, sel=maxsel, interest_rate=0.04, ppy=1, rates = am92_rates):
     """
     Return the expected present value for a limited term annuity paying 1 annually, contingent on life.
 
     Extends the whole life annuity function to a limited term. Calculated by subtracting a discounted
     whole life annuity at age (x+n) from a whole life annuity at age x.
+
+    Keyword arguments:
+    x -- Age of the life
+    duration -- Length of the annuity from x
+    sel -- Remaining years of selection; 0 for ultimate mortality
+    interest_rate -- effective annual interest rate
+    ppy -- payments per year
+    rates -- choice of death table
+
+    Sel = 0 means ultimate, increasing by one for each year of selection REMAINING.
+    Thus, the default sel={number of columns - 1} is a just-selected life [x].
     """
     
     #adxn = ad(x) - [D(x+n)/D(x)]ad(x+n)
-    if duration < rates.columns[-1]:
+    if duration < maxsel:
         print("This number is definitly not correct, durations shorter than select periods are fucked")
     v = (1+interest_rate)**-1
     adx = ann_due(x, sel = sel)
@@ -94,7 +105,24 @@ def ann_due_temp(x, duration, sel=maxsel, interest_rate=0.04, ppy=1):
     adxn = adxn - ((ppy - 1)/(2*ppy)) * (1 - v**duration * l(x + duration, 0) / l(x, sel))
     return adxn
 
-def assurance(x, duration = 0, sel=maxsel, interest_rate=0.04):
+def assurance(x, duration = 0, sel=maxsel, interest_rate=0.04, contn = False, rates = am92_rates):
+    """
+    Return the expected present value for a limited term annuity paying 1 annually, contingent on life.
+
+    Extends the whole life annuity function to a limited term. Calculated by subtracting a discounted
+    whole life annuity at age (x+n) from a whole life annuity at age x.
+
+    Keyword arguments:
+    x -- Age of the life
+    duration -- Length of the annuity from x
+    sel -- Remaining years of selection; 0 for ultimate mortality
+    interest_rate -- effective annual interest rate
+    contn -- Payment immediately upon death (T) or at EOYOD (F)
+    rates -- Choice of death table (AM92, ELT15, PMA)
+
+    Sel = 0 means ultimate, increasing by one for each year of selection REMAINING.
+    Thus, the default sel={number of columns - 1} is a just-selected life [x].
+    """
     v = (1 + interest_rate)**-1
     base = l(x, sel) * v**x
     terminus = x + duration if duration else rates.index[-1]+1
@@ -103,13 +131,28 @@ def assurance(x, duration = 0, sel=maxsel, interest_rate=0.04):
     #min(sel, i-x) yields 0, 1, 2, 2, 2... for sel = 2
     return ass
 
-def endowment(x, duration, sel=maxsel, interest_rate=0.04):
+def endowment(x, duration, sel=maxsel, interest_rate=0.04, contn = False, rates = am92_rates):
     v = (1+interest_rate)**-1
     mortality = l(x+duration, 0)/l(x, sel)
     return v**duration * mortality
 
-def endo_ass(x, duration, sel = maxsel, interest_rate = 0.04):
-    return assurance(x, duration, sel, interest_rate) + endowment(x, duration, sel, interest_rate)
+def endo_ass(x, duration, sel = maxsel, interest_rate = 0.04, contn = False, rates = am92_rates):
+    return assurance(x, duration, sel, interest_rate, contn, rates) + endowment(x, duration, sel, interest_rate, contn, rates)
+
+def premium():
+    prem_type = "annual" #single, annual, quarterly, monthly, continuous
+    components = [null(side = "premium", pay_type = "annuity", frequency = "monthly", x = 53, duration = 12, rate = 0.04, table = "AM92", mortality = "select"), #unit = "money" definitionally
+                  null(side = "benefit", pay_type = "assurance", x = 65, duration = 0, contn = False, value = 1000, unit = "money"),
+                  null(side = "expense", pay_type = "assurance", x = 65, duration = 0, contn = False, value = 10, unit = "money"),
+                  null(side = "expense", pay_type = "single", x = 53, value = 0.75, unit = "premium"),
+                  null(side = "expense", pay_type = "single", x = 53, value = 150, unit = "money"),
+                  null(side = "expense", pay_type = "annuity", frequency = "annual", x = 54, duration = 11, rate = 0.04, value = 0.05, unit = "premium"),
+                  null(side = "expense", pay_type = "annuity", frequency = "annual", x = 54, duration = 11, rate = 0.04, value = 10, unit = "money"),
+                  ]
+    pass
+
+def null(**kwargs):
+    pass
 
 def test():
     print("+------------------------+")
@@ -127,10 +170,5 @@ def test():
     print(f"A_[53]....... =  {assurance(53):.6f}") #0.363923
     print(f"A_53......... =  {assurance(53, sel = 0):.6f}") #0.364475
     print("+------------------------+")
-    print("INSERT ENDO ASS TESTS")
-    # data = {"l_53":[l(53, 0), l(53), np.nan],
-    #         "X_l_53":[round(l(53, 0),6)==0.963005, round(l(53), 6)==0.962110, pd.isna(np.nan)],
-    #         ":a_53":[ann_due(53, 0), ann_due(53), ann_due(53, sel = 0, ppy = 4)],
-    #         "X_:a_53":[round(ann_due(53, 0), 6)==16.523642, round(ann_due(53), 6)==16.537994, round(ann_due(53, sel = 0, ppy = 4), 6)==16.148642],
-    #         ":a_53:12":[ann_due_temp(x = 53, duration = 12), ann_due_temp(x = 53, duration = 12, sel = 0), ann_due_temp(x = 53, duration = 12, sel = 0, ppy = 4)]}
-    # print(pd.DataFrame(data, index = ["ult", "sel", "qrtly"]))
+    print(f"A_[53]:12.... =  {endo_ass(53, 12):.6f}") #0.634304
+    print(f"A_53:12...... =  {endo_ass(53, 12, sel = 0):.6f}") #0.634605
