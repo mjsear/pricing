@@ -1,9 +1,6 @@
-#TO DO NEXT: 
-# * Assurance, endowment
+#TO DO: 
 # * Modify annuities to allow for deferred onset
 # * Fix up all the pandas slices that were previously written assuming unhelpful column names
-# * Refactor life function so that 0 means just selected. 
-
 
 from operator import index
 import numpy as np
@@ -15,8 +12,8 @@ with open("data/am92rates.csv") as f: #THIS STUFF HAS TO BE CHANGED TO ALLOW FOR
     am92_rates.index.name = "Age"
     am92_rates.columns = reversed(range(len(am92_rates.columns)))
     maxsel = am92_rates.columns[0] #NOTICE: This choice of definition for the column labels is important and useful below.
-                              #        Under this definition, ultimate mortality is NAMED "0", and the years of 
-                              #        remaining selection are NAMED "1", "2", etc.
+                                   #        Under this definition, ultimate mortality is NAMED "0", and the years of 
+                                   #        remaining selection are NAMED "1", "2", etc.
 
 @lru_cache(maxsize=None)
 def l(x, sel=maxsel, rates = am92_rates):
@@ -94,10 +91,10 @@ def ann_due_temp(x, duration, sel=maxsel, interest_rate=0.04, ppy=1, rates = am9
     if duration < maxsel:
         print("This number is definitly not correct, durations shorter than select periods are fucked")
     v = (1+interest_rate)**-1
-    adx = ann_due(x, sel = sel)
+    adx = ann_due(x, sel = sel, interest_rate=interest_rate)
     dx = v**x * l(x, sel)
     dxpn = v**(x+duration) * l(x+duration, 0)
-    adxpn = ann_due(x + duration, 0)
+    adxpn = ann_due(x + duration, 0, interest_rate=interest_rate)
 
     adxn = adx - (dxpn/dx)*adxpn
 
